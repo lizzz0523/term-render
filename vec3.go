@@ -47,6 +47,14 @@ func (v vec3) mul(s float64) vec3 {
 	return vec3{v.x * s, v.y * s, v.z * s}
 }
 
+func (v vec3) cross(u vec3) vec3 {
+	return vec3{v.y*u.z - v.z*u.y, v.z*u.x - v.x*u.z, v.x*u.y - v.y*u.x}
+}
+
+func (v vec3) len() float64 {
+	return math.Sqrt(v.x*v.x + v.y*v.y + v.z*v.z)
+}
+
 func (v vec3) rotY(angle float64) vec3 {
 	s, c := math.Sin(angle), math.Cos(angle)
 	return vec3{v.x*c + v.z*s, v.y, -v.x*s + v.z*c}
