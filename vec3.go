@@ -55,6 +55,17 @@ func (v vec3) len() float64 {
 	return math.Sqrt(v.x*v.x + v.y*v.y + v.z*v.z)
 }
 
+func (v vec3) comp(axis int) float64 {
+	switch axis {
+	case 0:
+		return v.x
+	case 1:
+		return v.y
+	default:
+		return v.z
+	}
+}
+
 func (v vec3) rotY(angle float64) vec3 {
 	s, c := math.Sin(angle), math.Cos(angle)
 	return vec3{v.x*c + v.z*s, v.y, -v.x*s + v.z*c}

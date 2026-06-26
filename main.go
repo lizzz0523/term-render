@@ -93,11 +93,28 @@ func brightness(bx, by, bw, bh int, t float64) float64 {
 	px := (float64(bx)/float64(bw) - 0.5) * 2 * aspect
 	py := (float64(by)/float64(bh) - 0.5) * -2
 
-	n, hp, ok := modelIntersect(t, px, py)
+	n, hp, ok := intersect(t, px, py)
 	if !ok {
 		return 0
 	}
 	return shading(n, hp)
+}
+
+func intersect(t, px, py float64) (n, hp vec3, ok bool) {
+	ro := camera
+	rd := vec3{px, py, 1}.norm()
+
+	angleX := 0.5 + 0.3*math.Sin(t*0.6)
+	angleY := t * 0.7
+
+	rd = rd.rotY(-angleY).rotX(-angleX)
+	ro = ro.rotY(-angleY).rotX(-angleX)
+
+	hit, ok := model.Root.intersect(ro, rd)
+	if !ok {
+		return vec3{}, vec3{}, false
+	}
+	return hit.Normal, hit.Point, true
 }
 
 func shading(n, hp vec3) float64 {
@@ -116,23 +133,6 @@ func shading(n, hp vec3) float64 {
 	}
 
 	return brightness
-}
-
-func modelIntersect(t, px, py float64) (n, hp vec3, ok bool) {
-	ro := camera
-	rd := vec3{px, py, 1}.norm()
-
-	angleX := 0.5 + 0.3*math.Sin(t*0.6)
-	angleY := t * 0.7
-
-	rd = rd.rotY(-angleY).rotX(-angleX)
-	ro = ro.rotY(-angleY).rotX(-angleX)
-
-	hit, ok := model.Root.intersect(ro, rd)
-	if !ok {
-		return vec3{}, vec3{}, false
-	}
-	return hit.Normal, hit.Point, true
 }
 
 func floydSteinberg(buf [][]float64, bw, bh int) {

@@ -8,6 +8,18 @@ import (
 	"github.com/qmuntal/gltf"
 )
 
+type Triangle struct {
+	V0, V1, V2 vec3
+	N0, N1, N2 vec3
+}
+
+type BVHNode struct {
+	Min, Max  vec3
+	Left      *BVHNode
+	Right     *BVHNode
+	Triangles []Triangle
+}
+
 type Model struct {
 	Root   *BVHNode
 	Radius float64
@@ -161,4 +173,57 @@ func scaleTriangles(tris []Triangle, s float64) {
 		tris[i].V1 = tris[i].V1.mul(s)
 		tris[i].V2 = tris[i].V2.mul(s)
 	}
+}
+
+func buildBVH(tris []Triangle) *BVHNode {
+	if len(tris) == 0 {
+		return nil
+	}
+	node := &BVHNode{}
+	node.Min = tris[0].V0
+	node.Max = tris[0].V0
+	for _, t := range tris {
+		for _, v := range []vec3{t.V0, t.V1, t.V2} {
+			node.Min = minVec(node.Min, v)
+			node.Max = maxVec(node.Max, v)
+		}
+	}
+
+	if len(tris) <= 4 {
+		node.Triangles = tris
+		return node
+	}
+
+	size := node.Max.sub(node.Min)
+	var axis int
+	if size.x >= size.y && size.x >= size.z {
+		axis = 0
+	} else if size.y >= size.x && size.y >= size.z {
+		axis = 1
+	} else {
+		axis = 2
+	}
+
+	mid := 0.5 * (node.Min.comp(axis) + node.Max.comp(axis))
+
+	leftTris := make([]Triangle, 0, len(tris)/2)
+	rightTris := make([]Triangle, 0, len(tris)/2)
+
+	for _, t := range tris {
+		center := t.V0.add(t.V1).add(t.V2).mul(1.0 / 3)
+		if center.comp(axis) < mid {
+			leftTris = append(leftTris, t)
+		} else {
+			rightTris = append(rightTris, t)
+		}
+	}
+
+	if len(leftTris) == 0 || len(rightTris) == 0 {
+		node.Triangles = tris
+		return node
+	}
+
+	node.Left = buildBVH(leftTris)
+	node.Right = buildBVH(rightTris)
+	return node
 }
