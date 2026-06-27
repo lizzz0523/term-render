@@ -2,6 +2,8 @@ package renderer
 
 import (
 	"math"
+	"runtime"
+	"sync"
 
 	"test-term/internal/geo"
 	mdl "test-term/internal/model"
@@ -43,7 +45,35 @@ func (r *Renderer) Render(s tcell.Screen, t float64, model *mdl.Model) {
 }
 
 func renderToBuffer(buf [][]float64, bw, bh int, t float64, model *mdl.Model) {
-	for y := 0; y < bh; y++ {
+	numCPU := runtime.GOMAXPROCS(0)
+	if bh < numCPU*2 {
+		renderRowRange(buf, bw, bh, t, model, 0, bh)
+		return
+	}
+
+	rowsPer := (bh + numCPU - 1) / numCPU
+	var wg sync.WaitGroup
+
+	for i := 0; i < numCPU; i++ {
+		y0 := i * rowsPer
+		if y0 >= bh {
+			break
+		}
+		y1 := y0 + rowsPer
+		if y1 > bh {
+			y1 = bh
+		}
+		wg.Add(1)
+		go func(y0, y1 int) {
+			defer wg.Done()
+			renderRowRange(buf, bw, bh, t, model, y0, y1)
+		}(y0, y1)
+	}
+	wg.Wait()
+}
+
+func renderRowRange(buf [][]float64, bw, bh int, t float64, model *mdl.Model, y0, y1 int) {
+	for y := y0; y < y1; y++ {
 		for x := 0; x < bw; x++ {
 			buf[y][x] = brightness(x, y, bw, bh, t, model)
 		}
