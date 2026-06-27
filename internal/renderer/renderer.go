@@ -98,9 +98,7 @@ func raycast(camera Camera, px, py float64, scene Scene) (n, hp, vp geo.Vec3, ok
 	if !ok {
 		return geo.Vec3{}, geo.Vec3{}, geo.Vec3{}, false
 	}
-	normal := hit.Normal.RotX(camera.Pitch).RotY(camera.Yaw)
-
-	return normal, hit.Point, ro, true
+	return hit.Normal, hit.Point, ro, true
 }
 
 func shading(n, hp, vp geo.Vec3) float64 {
