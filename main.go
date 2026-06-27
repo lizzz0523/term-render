@@ -33,6 +33,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	model.TranslateY(-1.0)
+
 	scene := &ViewScene{Model: model}
 	s, err := tcell.NewScreen()
 	if err != nil {
@@ -55,7 +57,7 @@ func main() {
 		}
 	}()
 
-	camera := renderer.Camera{Pos: geo.NewVec3(0, 0, -7.0), Yaw: 0, Pitch: 0}
+	camera := renderer.Camera{Pos: geo.NewVec3(0, 0, -6.0), Yaw: 0, Pitch: 0}
 
 	for {
 		select {

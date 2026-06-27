@@ -73,9 +73,18 @@ func LoadGLB(path string, targetRadius float64) (*Model, error) {
 		return nil, fmt.Errorf("no meshes found in GLB")
 	}
 
+	parent := buildParentMap(doc)
+	meshNode := buildMeshMap(doc)
+	worldMatrices := computeWorldMatrices(doc, parent)
+
 	var allTris []triangle
 
-	for _, mesh := range doc.Meshes {
+	for meshIdx, mesh := range doc.Meshes {
+		worldMat := geo.Mat4Identity()
+		if nodeIdx, ok := meshNode[meshIdx]; ok {
+			worldMat = worldMatrices[nodeIdx]
+		}
+
 		for _, prim := range mesh.Primitives {
 			posAcc := doc.Accessors[prim.Attributes["POSITION"]]
 			positions := readFloats(doc, posAcc)
@@ -88,7 +97,7 @@ func LoadGLB(path string, targetRadius float64) (*Model, error) {
 
 			indices := readIndices(doc, doc.Accessors[*prim.Indices])
 
-			tris := buildTriangles(positions, normals, indices)
+			tris := buildTriangles(positions, normals, indices, worldMat)
 			allTris = append(allTris, tris...)
 		}
 	}
@@ -107,6 +116,88 @@ func LoadGLB(path string, targetRadius float64) (*Model, error) {
 	root := buildBVH(allTris)
 
 	return &Model{root: root, radius: targetRadius}, nil
+}
+
+// buildParentMap maps each child node index to its parent node index.
+func buildParentMap(doc *gltf.Document) map[int]int {
+	parent := make(map[int]int)
+	for i, n := range doc.Nodes {
+		for _, child := range n.Children {
+			parent[child] = i
+		}
+	}
+	return parent
+}
+
+// buildMeshMap returns a map from mesh index to the node index that references it.
+func buildMeshMap(doc *gltf.Document) map[int]int {
+	result := make(map[int]int)
+	for i, n := range doc.Nodes {
+		if n.Mesh != nil {
+			result[*n.Mesh] = i
+		}
+	}
+	return result
+}
+
+// computeWorldMatrices computes the world-space transform for every node
+// by traversing the scene graph from root nodes.
+func computeWorldMatrices(doc *gltf.Document, parent map[int]int) []geo.Mat4 {
+	result := make([]geo.Mat4, len(doc.Nodes))
+	for i := range result {
+		result[i] = geo.Mat4Identity()
+	}
+
+	var roots []int
+	for i := range doc.Nodes {
+		if _, hasParent := parent[i]; !hasParent {
+			roots = append(roots, i)
+		}
+	}
+
+	var traverse func(nodeIdx int, parentWorld geo.Mat4)
+	traverse = func(nodeIdx int, parentWorld geo.Mat4) {
+		if nodeIdx >= len(doc.Nodes) {
+			return
+		}
+		n := doc.Nodes[nodeIdx]
+		local := nodeLocalMatrix(n)
+		world := parentWorld.Mul(local)
+		result[nodeIdx] = world
+
+		for _, child := range n.Children {
+			traverse(child, world)
+		}
+	}
+
+	for _, root := range roots {
+		traverse(root, geo.Mat4Identity())
+	}
+
+	return result
+}
+
+// nodeLocalMatrix returns the local TRS matrix.
+// Uses the explicit Matrix field if set, otherwise decomposes from T*R*S.
+func nodeLocalMatrix(n *gltf.Node) geo.Mat4 {
+	m := n.MatrixOrDefault()
+	if m != gltf.DefaultMatrix {
+		return geo.Mat4From64(m)
+	}
+
+	tx, ty, tz := n.Translation[0], n.Translation[1], n.Translation[2]
+	T := geo.Mat4Translation(tx, ty, tz)
+
+	r := n.RotationOrDefault()
+	R := geo.Mat4Rotation(r[0], r[1], r[2], r[3])
+
+	sx, sy, sz := n.Scale[0], n.Scale[1], n.Scale[2]
+	S := geo.Mat4Identity()
+	if sx != 1 || sy != 1 || sz != 1 {
+		S = geo.Mat4Scale(sx, sy, sz)
+	}
+
+	return T.Mul(R).Mul(S)
 }
 
 func readFloats(doc *gltf.Document, acc *gltf.Accessor) []float64 {
@@ -146,7 +237,7 @@ func readIndices(doc *gltf.Document, acc *gltf.Accessor) []uint32 {
 	return result
 }
 
-func buildTriangles(positions, normals []float64, indices []uint32) []triangle {
+func buildTriangles(positions, normals []float64, indices []uint32, mat geo.Mat4) []triangle {
 	tris := make([]triangle, 0, len(indices)/3)
 	hasNormals := len(normals) == len(positions)
 
@@ -157,11 +248,18 @@ func buildTriangles(positions, normals []float64, indices []uint32) []triangle {
 		v1 := geo.NewVec3(positions[i1*3], positions[i1*3+1], positions[i1*3+2])
 		v2 := geo.NewVec3(positions[i2*3], positions[i2*3+1], positions[i2*3+2])
 
+		v0 = mat.TransformPoint(v0)
+		v1 = mat.TransformPoint(v1)
+		v2 = mat.TransformPoint(v2)
+
 		var n0, n1, n2 geo.Vec3
 		if hasNormals {
 			n0 = geo.NewVec3(normals[i0*3], normals[i0*3+1], normals[i0*3+2])
 			n1 = geo.NewVec3(normals[i1*3], normals[i1*3+1], normals[i1*3+2])
 			n2 = geo.NewVec3(normals[i2*3], normals[i2*3+1], normals[i2*3+2])
+			n0 = mat.TransformDirection(n0).Norm()
+			n1 = mat.TransformDirection(n1).Norm()
+			n2 = mat.TransformDirection(n2).Norm()
 		} else {
 			e1 := v1.Sub(v0)
 			e2 := v2.Sub(v0)

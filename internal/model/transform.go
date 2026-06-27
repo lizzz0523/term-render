@@ -19,6 +19,10 @@ func (m *Model) RotateZ(angle float64) {
 	m.root.rotateZ(angle)
 }
 
+func (m *Model) TranslateY(dy float64) {
+	m.root.translateY(dy)
+}
+
 func (n *bvhNode) scale(s float64) {
 	if n == nil {
 		return
@@ -74,6 +78,19 @@ func (n *bvhNode) rotateZ(angle float64) {
 	n.recalcAABB()
 }
 
+func (n *bvhNode) translateY(dy float64) {
+	if n == nil {
+		return
+	}
+	n.min.Y += dy
+	n.max.Y += dy
+	for i := range n.triangles {
+		n.triangles[i].translateY(dy)
+	}
+	n.left.translateY(dy)
+	n.right.translateY(dy)
+}
+
 func (n *bvhNode) recalcAABB() {
 	if len(n.triangles) > 0 {
 		n.min = n.triangles[0].v0
@@ -115,4 +132,10 @@ func (t *triangle) rotateZ(angle float64) {
 	t.n0 = t.n0.RotZ(angle)
 	t.n1 = t.n1.RotZ(angle)
 	t.n2 = t.n2.RotZ(angle)
+}
+
+func (t *triangle) translateY(dy float64) {
+	t.v0.Y += dy
+	t.v1.Y += dy
+	t.v2.Y += dy
 }
