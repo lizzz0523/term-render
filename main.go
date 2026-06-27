@@ -1,39 +1,25 @@
 package main
 
 import (
-	"fmt"
-	"os"
+	"math"
 	"time"
 
-	"term-render/internal/geo"
+	"term-render/internal/game"
 	mdl "term-render/internal/model"
 	"term-render/internal/renderer"
 
 	"github.com/gdamore/tcell/v2"
 )
 
-type ViewScene struct {
-	*mdl.Model
-}
-
-func (v *ViewScene) Intersect(ro, rd geo.Vec3) (renderer.Hit, bool) {
-	hit, ok := v.Model.Intersect(ro, rd)
-	if !ok {
-		return renderer.Hit{}, false
-	}
-	return renderer.Hit{Point: hit.Point, Normal: hit.Normal}, true
-}
-
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintf(os.Stderr, "usage: %s <model.glb>\n", os.Args[0])
-		os.Exit(1)
-	}
-	model, err := mdl.LoadGLB(os.Args[1], 5.0)
+	gun, err := mdl.LoadGLB("./models/mac10.glb", 5.0)
 	if err != nil {
 		panic(err)
 	}
-	scene := &ViewScene{Model: model}
+	gun.RotateY(-math.Pi / 2)
+	gun.Scale(0.12)
+	enemy := mdl.NewCube(0.8, 1.8, 0.8)
+
 	s, err := tcell.NewScreen()
 	if err != nil {
 		panic(err)
@@ -43,8 +29,9 @@ func main() {
 	}
 	defer s.Fini()
 
+	g := game.NewGame(gun, enemy)
 	r := renderer.New()
-	prev := time.Now()
+	start := time.Now()
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 
@@ -55,23 +42,18 @@ func main() {
 		}
 	}()
 
-	camera := renderer.Camera{Pos: geo.NewVec3(0, 0, -7.0), Yaw: 0, Pitch: 0}
-
 	for {
 		select {
 		case <-ticker.C:
-			now := time.Now()
-			dt := now.Sub(prev).Seconds()
-			prev = now
-
-			model.RotateY(0.7 * dt)
+			g.GameTime = time.Since(start).Seconds()
 			s.Clear()
-			r.Render(s, camera, scene)
+			r.Render(s, renderer.Camera{Pos: g.Player.Pos, Yaw: g.Player.Angle}, g)
+			w, h := s.Size()
+			s.PutStrStyled(w/2, h/2, "+", tcell.StyleDefault.Foreground(tcell.ColorRed))
 			s.Show()
 
 		case ev := <-eventCh:
-			switch ev.(type) {
-			case *tcell.EventKey:
+			if !g.HandleInput(ev) {
 				return
 			}
 		}

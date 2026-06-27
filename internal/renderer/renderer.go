@@ -92,7 +92,7 @@ func brightness(bx, by, bw, bh int, camera Camera, scene Scene) float64 {
 func raycast(camera Camera, px, py float64, scene Scene) (n, hp, vp geo.Vec3, ok bool) {
 	ro := camera.Pos
 	rd := geo.NewVec3(px, py, 1).Norm()
-	rd = rd.RotY(-camera.Yaw).RotX(-camera.Pitch)
+	rd = rd.RotX(-camera.Pitch).RotY(camera.Yaw)
 
 	hit, ok := scene.Intersect(ro, rd)
 	if !ok {
