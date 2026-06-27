@@ -85,14 +85,14 @@ func brightness(bx, by, bw, bh int, t float64, model *mdl.Model) float64 {
 	px := (float64(bx)/float64(bw) - 0.5) * 2 * aspect
 	py := (float64(by)/float64(bh) - 0.5) * -2
 
-	n, hp, ok := raycast(t, px, py, model)
+	n, hp, vp, ok := raycast(t, px, py, model)
 	if !ok {
 		return 0
 	}
-	return shading(n, hp)
+	return shading(n, hp, vp)
 }
 
-func raycast(t, px, py float64, model *mdl.Model) (n, hp geo.Vec3, ok bool) {
+func raycast(t, px, py float64, model *mdl.Model) (n, hp, vp geo.Vec3, ok bool) {
 	ro := camera
 	rd := geo.NewVec3(px, py, 1).Norm()
 
@@ -104,12 +104,14 @@ func raycast(t, px, py float64, model *mdl.Model) (n, hp geo.Vec3, ok bool) {
 
 	hit, ok := model.Intersect(ro, rd)
 	if !ok {
-		return geo.Vec3{}, geo.Vec3{}, false
+		return geo.Vec3{}, geo.Vec3{}, geo.Vec3{}, false
 	}
-	return hit.Normal, hit.Point, true
+	normal := hit.Normal.RotX(angleX).RotY(angleY)
+
+	return normal, hit.Point, ro, true
 }
 
-func shading(n, hp geo.Vec3) float64 {
+func shading(n, hp, vp geo.Vec3) float64 {
 	light := geo.NewVec3(0.3, 0.5, -0.8).Norm()
 	ambient := 0.25
 
@@ -118,7 +120,7 @@ func shading(n, hp geo.Vec3) float64 {
 		brightness = 1
 	}
 
-	viewDir := camera.Sub(hp).Norm()
+	viewDir := vp.Sub(hp).Norm()
 	rim := 1 - math.Abs(n.Dot(viewDir))
 	if rim > 0.65 {
 		brightness = math.Min(1, brightness+0.35)
