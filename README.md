@@ -2,7 +2,7 @@
 
 一个在终端中实时渲染 3D 模型的工具，使用 tcell 和自定义软件渲染管线。
 
-https://github.com/user-attachments/assets/99cfb198-7e3a-474f-a3d5-1a82e1a25677
+https://github.com/user-attachments/assets/cdccdbc5-8762-415e-87e2-045646133096
 
 ## 用法
 
