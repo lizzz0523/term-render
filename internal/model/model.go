@@ -75,9 +75,9 @@ func LoadGLB(path string) (*Model, error) {
 }
 
 func readFloats(doc *gltf.Document, acc *gltf.Accessor) []float64 {
-	bv := doc.BufferViews[*acc.BufferView]
-	bufData := doc.Buffers[bv.Buffer].Data
-	start := bv.ByteOffset + acc.ByteOffset
+	bufView := doc.BufferViews[*acc.BufferView]
+	bufData := doc.Buffers[bufView.Buffer].Data
+	start := bufView.ByteOffset + acc.ByteOffset
 	comps := acc.Type.Components()
 	count := acc.Count
 	byteSize := acc.ComponentType.ByteSize()
@@ -91,9 +91,9 @@ func readFloats(doc *gltf.Document, acc *gltf.Accessor) []float64 {
 }
 
 func readIndices(doc *gltf.Document, acc *gltf.Accessor) []uint32 {
-	bv := doc.BufferViews[*acc.BufferView]
-	bufData := doc.Buffers[bv.Buffer].Data
-	start := bv.ByteOffset + acc.ByteOffset
+	bufView := doc.BufferViews[*acc.BufferView]
+	bufData := doc.Buffers[bufView.Buffer].Data
+	start := bufView.ByteOffset + acc.ByteOffset
 	count := acc.Count
 	byteSize := acc.ComponentType.ByteSize()
 
