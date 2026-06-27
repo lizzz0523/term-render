@@ -63,7 +63,7 @@ func NewCube(w, h, d float64) *Model {
 	return &Model{root: root, radius: math.Sqrt(hw*hw + hh*hh + hd*hd)}
 }
 
-func LoadGLB(path string) (*Model, error) {
+func LoadGLB(path string, targetRadius float64) (*Model, error) {
 	doc, err := gltf.Open(path)
 	if err != nil {
 		return nil, err
@@ -100,7 +100,6 @@ func LoadGLB(path string) (*Model, error) {
 	center := computeCenter(allTris)
 	centerTriangles(allTris, center)
 
-	targetRadius := 5.0
 	radius := computeRadius(allTris)
 	scale := targetRadius / radius
 	scaleTriangles(allTris, scale)

@@ -79,3 +79,8 @@ func (v Vec3) RotX(angle float64) Vec3 {
 	s, c := math.Sin(angle), math.Cos(angle)
 	return Vec3{v.X, v.Y*c - v.Z*s, v.Y*s + v.Z*c}
 }
+
+func (v Vec3) RotZ(angle float64) Vec3 {
+	s, c := math.Sin(angle), math.Cos(angle)
+	return Vec3{v.X*c - v.Y*s, v.X*s + v.Y*c, v.Z}
+}

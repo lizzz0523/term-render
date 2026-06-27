@@ -29,7 +29,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "usage: %s <model.glb>\n", os.Args[0])
 		os.Exit(1)
 	}
-	model, err := mdl.LoadGLB(os.Args[1])
+	model, err := mdl.LoadGLB(os.Args[1], 5.0)
 	if err != nil {
 		panic(err)
 	}
