@@ -2,6 +2,8 @@
 
 一个在终端中实时渲染 3D 模型的工具，使用 tcell 和自定义软件渲染管线。
 
+<video src="mac10.mp4" controls width="100%"></video>
+
 ## 用法
 
 ```bash
