@@ -1,28 +1,30 @@
-package main
+package model
 
 import (
 	"encoding/binary"
 	"fmt"
 	"math"
 
+	"test-term/internal/geo"
+
 	"github.com/qmuntal/gltf"
 )
 
-type Triangle struct {
-	V0, V1, V2 vec3
-	N0, N1, N2 vec3
-}
-
-type BVHNode struct {
-	Min, Max  vec3
-	Left      *BVHNode
-	Right     *BVHNode
-	Triangles []Triangle
-}
-
 type Model struct {
-	Root   *BVHNode
-	Radius float64
+	root   *bvhNode
+	radius float64
+}
+
+type bvhNode struct {
+	min, max  geo.Vec3
+	left      *bvhNode
+	right     *bvhNode
+	triangles []triangle
+}
+
+type triangle struct {
+	v0, v1, v2 geo.Vec3
+	n0, n1, n2 geo.Vec3
 }
 
 func LoadGLB(path string) (*Model, error) {
@@ -67,7 +69,7 @@ func LoadGLB(path string) (*Model, error) {
 
 	root := buildBVH(triangles)
 
-	return &Model{Root: root, Radius: targetRadius}, nil
+	return &Model{root: root, radius: targetRadius}, nil
 }
 
 func readFloats(doc *gltf.Document, acc *gltf.Accessor) []float64 {
@@ -107,59 +109,59 @@ func readIndices(doc *gltf.Document, acc *gltf.Accessor) []uint32 {
 	return result
 }
 
-func buildTriangles(positions, normals []float64, indices []uint32) []Triangle {
-	tris := make([]Triangle, 0, len(indices)/3)
+func buildTriangles(positions, normals []float64, indices []uint32) []triangle {
+	tris := make([]triangle, 0, len(indices)/3)
 	hasNormals := len(normals) == len(positions)
 
 	for i := 0; i < len(indices); i += 3 {
 		i0, i1, i2 := indices[i], indices[i+1], indices[i+2]
 
-		v0 := vec3{positions[i0*3], positions[i0*3+1], positions[i0*3+2]}
-		v1 := vec3{positions[i1*3], positions[i1*3+1], positions[i1*3+2]}
-		v2 := vec3{positions[i2*3], positions[i2*3+1], positions[i2*3+2]}
+		v0 := geo.NewVec3(positions[i0*3], positions[i0*3+1], positions[i0*3+2])
+		v1 := geo.NewVec3(positions[i1*3], positions[i1*3+1], positions[i1*3+2])
+		v2 := geo.NewVec3(positions[i2*3], positions[i2*3+1], positions[i2*3+2])
 
-		var n0, n1, n2 vec3
+		var n0, n1, n2 geo.Vec3
 		if hasNormals {
-			n0 = vec3{normals[i0*3], normals[i0*3+1], normals[i0*3+2]}
-			n1 = vec3{normals[i1*3], normals[i1*3+1], normals[i1*3+2]}
-			n2 = vec3{normals[i2*3], normals[i2*3+1], normals[i2*3+2]}
+			n0 = geo.NewVec3(normals[i0*3], normals[i0*3+1], normals[i0*3+2])
+			n1 = geo.NewVec3(normals[i1*3], normals[i1*3+1], normals[i1*3+2])
+			n2 = geo.NewVec3(normals[i2*3], normals[i2*3+1], normals[i2*3+2])
 		} else {
-			e1 := v1.sub(v0)
-			e2 := v2.sub(v0)
-			fn := e1.cross(e2).norm()
+			e1 := v1.Sub(v0)
+			e2 := v2.Sub(v0)
+			fn := e1.Cross(e2).Norm()
 			n0, n1, n2 = fn, fn, fn
 		}
 
-		tris = append(tris, Triangle{V0: v0, V1: v1, V2: v2, N0: n0, N1: n1, N2: n2})
+		tris = append(tris, triangle{v0, v1, v2, n0, n1, n2})
 	}
 	return tris
 }
 
-func computeCenter(tris []Triangle) vec3 {
-	min := tris[0].V0
-	max := tris[0].V0
+func computeCenter(tris []triangle) geo.Vec3 {
+	min := tris[0].v0
+	max := tris[0].v0
 	for _, t := range tris {
-		for _, v := range []vec3{t.V0, t.V1, t.V2} {
-			min = minVec(min, v)
-			max = maxVec(max, v)
+		for _, v := range []geo.Vec3{t.v0, t.v1, t.v2} {
+			min = geo.MinVec(min, v)
+			max = geo.MaxVec(max, v)
 		}
 	}
-	return min.add(max).mul(0.5)
+	return min.Add(max).Mul(0.5)
 }
 
-func centerTriangles(tris []Triangle, center vec3) {
+func centerTriangles(tris []triangle, center geo.Vec3) {
 	for i := range tris {
-		tris[i].V0 = tris[i].V0.sub(center)
-		tris[i].V1 = tris[i].V1.sub(center)
-		tris[i].V2 = tris[i].V2.sub(center)
+		tris[i].v0 = tris[i].v0.Sub(center)
+		tris[i].v1 = tris[i].v1.Sub(center)
+		tris[i].v2 = tris[i].v2.Sub(center)
 	}
 }
 
-func computeRadius(tris []Triangle) float64 {
+func computeRadius(tris []triangle) float64 {
 	r := 0.0
 	for _, t := range tris {
-		for _, v := range []vec3{t.V0, t.V1, t.V2} {
-			if d := v.len(); d > r {
+		for _, v := range []geo.Vec3{t.v0, t.v1, t.v2} {
+			if d := v.Len(); d > r {
 				r = d
 			}
 		}
@@ -167,51 +169,51 @@ func computeRadius(tris []Triangle) float64 {
 	return r
 }
 
-func scaleTriangles(tris []Triangle, s float64) {
+func scaleTriangles(tris []triangle, s float64) {
 	for i := range tris {
-		tris[i].V0 = tris[i].V0.mul(s)
-		tris[i].V1 = tris[i].V1.mul(s)
-		tris[i].V2 = tris[i].V2.mul(s)
+		tris[i].v0 = tris[i].v0.Mul(s)
+		tris[i].v1 = tris[i].v1.Mul(s)
+		tris[i].v2 = tris[i].v2.Mul(s)
 	}
 }
 
-func buildBVH(tris []Triangle) *BVHNode {
+func buildBVH(tris []triangle) *bvhNode {
 	if len(tris) == 0 {
 		return nil
 	}
-	node := &BVHNode{}
-	node.Min = tris[0].V0
-	node.Max = tris[0].V0
+	node := &bvhNode{}
+	node.min = tris[0].v0
+	node.max = tris[0].v0
 	for _, t := range tris {
-		for _, v := range []vec3{t.V0, t.V1, t.V2} {
-			node.Min = minVec(node.Min, v)
-			node.Max = maxVec(node.Max, v)
+		for _, v := range []geo.Vec3{t.v0, t.v1, t.v2} {
+			node.min = geo.MinVec(node.min, v)
+			node.max = geo.MaxVec(node.max, v)
 		}
 	}
 
 	if len(tris) <= 4 {
-		node.Triangles = tris
+		node.triangles = tris
 		return node
 	}
 
-	size := node.Max.sub(node.Min)
+	size := node.max.Sub(node.min)
 	var axis int
-	if size.x >= size.y && size.x >= size.z {
+	if size.X >= size.Y && size.X >= size.Z {
 		axis = 0
-	} else if size.y >= size.x && size.y >= size.z {
+	} else if size.Y >= size.X && size.Y >= size.Z {
 		axis = 1
 	} else {
 		axis = 2
 	}
 
-	mid := 0.5 * (node.Min.comp(axis) + node.Max.comp(axis))
+	mid := 0.5 * (node.min.Comp(axis) + node.max.Comp(axis))
 
-	leftTris := make([]Triangle, 0, len(tris)/2)
-	rightTris := make([]Triangle, 0, len(tris)/2)
+	leftTris := make([]triangle, 0, len(tris)/2)
+	rightTris := make([]triangle, 0, len(tris)/2)
 
 	for _, t := range tris {
-		center := t.V0.add(t.V1).add(t.V2).mul(1.0 / 3)
-		if center.comp(axis) < mid {
+		center := t.v0.Add(t.v1).Add(t.v2).Mul(1.0 / 3)
+		if center.Comp(axis) < mid {
 			leftTris = append(leftTris, t)
 		} else {
 			rightTris = append(rightTris, t)
@@ -219,11 +221,11 @@ func buildBVH(tris []Triangle) *BVHNode {
 	}
 
 	if len(leftTris) == 0 || len(rightTris) == 0 {
-		node.Triangles = tris
+		node.triangles = tris
 		return node
 	}
 
-	node.Left = buildBVH(leftTris)
-	node.Right = buildBVH(rightTris)
+	node.left = buildBVH(leftTris)
+	node.right = buildBVH(rightTris)
 	return node
 }

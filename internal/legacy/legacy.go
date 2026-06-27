@@ -1,28 +1,39 @@
-package main
+package legacy
 
-import "math"
+import (
+	"math"
 
-func box(t, px, py float64) (n, hp vec3, ok bool) {
+	"test-term/internal/geo"
+)
+
+const (
+	bound = 1.2
+	eps   = 0.01
+)
+
+var camera = geo.NewVec3(0, 0, -4.0)
+
+func box(t, px, py float64) (n, hp geo.Vec3, ok bool) {
 	ro := camera
-	rd := vec3{px, py, 1}.norm()
+	rd := geo.NewVec3(px, py, 1).Norm()
 
 	angleX := 0.5 + 0.3*math.Sin(t*0.6)
 	angleY := t * 0.7
 
-	rd = rd.rotY(-angleY).rotX(-angleX)
-	ro = ro.rotY(-angleY).rotX(-angleX)
+	rd = rd.RotY(-angleY).RotX(-angleX)
+	ro = ro.RotY(-angleY).RotX(-angleX)
 
-	nBound := vec3{-bound, -bound, -bound}
-	pBound := vec3{bound, bound, bound}
+	nBound := geo.NewVec3(-bound, -bound, -bound)
+	pBound := geo.NewVec3(bound, bound, bound)
 
-	t1 := nBound.sub(ro).div(rd)
-	t2 := pBound.sub(ro).div(rd)
+	t1 := nBound.Sub(ro).Div(rd)
+	t2 := pBound.Sub(ro).Div(rd)
 
-	tmin := maxVec(minVec(t1, t2), vec3{-1e9, -1e9, -1e9}).maxComp()
-	tmax := minVec(maxVec(t1, t2), vec3{1e9, 1e9, 1e9}).minComp()
+	tmin := geo.MaxVec(geo.MinVec(t1, t2), geo.NewVec3(-1e9, -1e9, -1e9)).MaxComp()
+	tmax := geo.MinVec(geo.MaxVec(t1, t2), geo.NewVec3(1e9, 1e9, 1e9)).MinComp()
 
 	if tmax < tmin || tmax < 0 {
-		return vec3{}, vec3{}, false
+		return geo.Vec3{}, geo.Vec3{}, false
 	}
 
 	d := tmin
@@ -30,51 +41,51 @@ func box(t, px, py float64) (n, hp vec3, ok bool) {
 		d = tmax
 	}
 
-	hp = ro.add(rd.mul(d))
+	hp = ro.Add(rd.Mul(d))
 
 	switch {
-	case hp.x > bound-eps:
-		n = vec3{1, 0, 0}
-	case hp.x < -bound+eps:
-		n = vec3{-1, 0, 0}
-	case hp.y > bound-eps:
-		n = vec3{0, 1, 0}
-	case hp.y < -bound+eps:
-		n = vec3{0, -1, 0}
-	case hp.z > bound-eps:
-		n = vec3{0, 0, 1}
-	case hp.z < -bound+eps:
-		n = vec3{0, 0, -1}
+	case hp.X > bound-eps:
+		n = geo.NewVec3(1, 0, 0)
+	case hp.X < -bound+eps:
+		n = geo.NewVec3(-1, 0, 0)
+	case hp.Y > bound-eps:
+		n = geo.NewVec3(0, 1, 0)
+	case hp.Y < -bound+eps:
+		n = geo.NewVec3(0, -1, 0)
+	case hp.Z > bound-eps:
+		n = geo.NewVec3(0, 0, 1)
+	case hp.Z < -bound+eps:
+		n = geo.NewVec3(0, 0, -1)
 	default:
-		return vec3{}, vec3{}, false
+		return geo.Vec3{}, geo.Vec3{}, false
 	}
-	n = n.rotX(angleX).rotY(angleY)
+	n = n.RotX(angleX).RotY(angleY)
 
 	return n, hp, true
 }
 
-func doughnut(t, px, py float64) (n, hp vec3, ok bool) {
+func doughnut(t, px, py float64) (n, hp geo.Vec3, ok bool) {
 	ro := camera
-	rd := vec3{px, py, 1}.norm()
+	rd := geo.NewVec3(px, py, 1).Norm()
 
 	angleX := 0.5 + 0.3*math.Sin(t*0.6)
 	angleY := t * 0.7
 
-	rd = rd.rotY(-angleY).rotX(-angleX)
-	ro = ro.rotY(-angleY).rotX(-angleX)
+	rd = rd.RotY(-angleY).RotX(-angleX)
+	ro = ro.RotY(-angleY).RotX(-angleX)
 
 	R := 1.3
 	r := 0.5
 	RR := R * R
 	rr := r * r
 
-	A := rd.dot(rd)
-	B := 2 * ro.dot(rd)
-	C := ro.dot(ro)
+	A := rd.Dot(rd)
+	B := 2 * ro.Dot(rd)
+	C := ro.Dot(ro)
 
-	Axy := rd.x*rd.x + rd.y*rd.y
-	Bxy := 2 * (ro.x*rd.x + ro.y*rd.y)
-	Cxy := ro.x*ro.x + ro.y*ro.y
+	Axy := rd.X*rd.X + rd.Y*rd.Y
+	Bxy := 2 * (ro.X*rd.X + ro.Y*rd.Y)
+	Cxy := ro.X*ro.X + ro.Y*ro.Y
 
 	K := C + RR - rr
 
@@ -86,21 +97,21 @@ func doughnut(t, px, py float64) (n, hp vec3, ok bool) {
 
 	roots := solveQuartic(a, b, c, d, e)
 	if len(roots) == 0 {
-		return vec3{}, vec3{}, false
+		return geo.Vec3{}, geo.Vec3{}, false
 	}
 
 	dist := roots[0]
-	hp = ro.add(rd.mul(dist))
+	hp = ro.Add(rd.Mul(dist))
 
-	dxy := hp.x*hp.x + hp.y*hp.y
+	dxy := hp.X*hp.X + hp.Y*hp.Y
 	if dxy < 1e-10 {
-		return vec3{}, vec3{}, false
+		return geo.Vec3{}, geo.Vec3{}, false
 	}
 	sdxy := math.Sqrt(dxy)
 	factor := 1 - R/sdxy
 
-	n = vec3{hp.x * factor, hp.y * factor, hp.z}.norm()
-	n = n.rotX(angleX).rotY(angleY)
+	n = geo.NewVec3(hp.X*factor, hp.Y*factor, hp.Z).Norm()
+	n = n.RotX(angleX).RotY(angleY)
 
 	return n, hp, true
 }
