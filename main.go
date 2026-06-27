@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"os"
 	"time"
 
 	mdl "test-term/internal/model"
@@ -10,7 +12,11 @@ import (
 )
 
 func main() {
-	model, err := mdl.LoadGLB("models/table_medium.glb")
+	if len(os.Args) < 2 {
+		fmt.Fprintf(os.Stderr, "usage: %s <model.glb>\n", os.Args[0])
+		os.Exit(1)
+	}
+	model, err := mdl.LoadGLB(os.Args[1])
 	if err != nil {
 		panic(err)
 	}

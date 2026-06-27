@@ -9,7 +9,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 )
 
-var camera = geo.NewVec3(0, 0, -4.0)
+var camera = geo.NewVec3(0, 0, -7.0)
 
 type Renderer struct {
 	buf          [][]float64

@@ -36,38 +36,40 @@ func LoadGLB(path string) (*Model, error) {
 	if len(doc.Meshes) == 0 {
 		return nil, fmt.Errorf("no meshes found in GLB")
 	}
-	mesh := doc.Meshes[0]
 
-	var positions []float64
-	var normals []float64
-	var indices []uint32
+	var allTris []triangle
 
-	for _, prim := range mesh.Primitives {
-		posAcc := doc.Accessors[prim.Attributes["POSITION"]]
-		positions = readFloats(doc, posAcc)
+	for _, mesh := range doc.Meshes {
+		for _, prim := range mesh.Primitives {
+			posAcc := doc.Accessors[prim.Attributes["POSITION"]]
+			positions := readFloats(doc, posAcc)
 
-		if idx, ok := prim.Attributes["NORMAL"]; ok {
-			nrmAcc := doc.Accessors[idx]
-			normals = readFloats(doc, nrmAcc)
+			var normals []float64
+			if idx, ok := prim.Attributes["NORMAL"]; ok {
+				nrmAcc := doc.Accessors[idx]
+				normals = readFloats(doc, nrmAcc)
+			}
+
+			indices := readIndices(doc, doc.Accessors[*prim.Indices])
+
+			tris := buildTriangles(positions, normals, indices)
+			allTris = append(allTris, tris...)
 		}
-
-		indices = readIndices(doc, doc.Accessors[*prim.Indices])
 	}
 
-	triangles := buildTriangles(positions, normals, indices)
-	if len(triangles) == 0 {
+	if len(allTris) == 0 {
 		return nil, fmt.Errorf("no triangles generated")
 	}
 
-	center := computeCenter(triangles)
-	centerTriangles(triangles, center)
+	center := computeCenter(allTris)
+	centerTriangles(allTris, center)
 
-	targetRadius := 2.0
-	radius := computeRadius(triangles)
+	targetRadius := 5.0
+	radius := computeRadius(allTris)
 	scale := targetRadius / radius
-	scaleTriangles(triangles, scale)
+	scaleTriangles(allTris, scale)
 
-	root := buildBVH(triangles)
+	root := buildBVH(allTris)
 
 	return &Model{root: root, radius: targetRadius}, nil
 }
