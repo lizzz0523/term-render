@@ -27,6 +27,42 @@ type triangle struct {
 	n0, n1, n2 geo.Vec3
 }
 
+func NewCube(w, h, d float64) *Model {
+	hw, hh, hd := w/2, h/2, d/2
+
+	V := func(x, y, z float64) geo.Vec3 { return geo.NewVec3(x, y, z) }
+	N := func(x, y, z float64) geo.Vec3 { return geo.NewVec3(x, y, z) }
+
+	mkTris := func(v0, v1, v2 geo.Vec3, n geo.Vec3) []triangle {
+		return []triangle{
+			{v0: v0, v1: v1, v2: v2, n0: n, n1: n, n2: n},
+		}
+	}
+
+	tris := make([]triangle, 0, 12)
+	// +X
+	tris = append(tris, mkTris(V(hw, -hh, -hd), V(hw, -hh, hd), V(hw, hh, hd), N(1, 0, 0))...)
+	tris = append(tris, mkTris(V(hw, -hh, -hd), V(hw, hh, hd), V(hw, hh, -hd), N(1, 0, 0))...)
+	// -X
+	tris = append(tris, mkTris(V(-hw, -hh, -hd), V(-hw, hh, hd), V(-hw, -hh, hd), N(-1, 0, 0))...)
+	tris = append(tris, mkTris(V(-hw, -hh, -hd), V(-hw, hh, -hd), V(-hw, hh, hd), N(-1, 0, 0))...)
+	// +Y
+	tris = append(tris, mkTris(V(-hw, hh, -hd), V(hw, hh, -hd), V(hw, hh, hd), N(0, 1, 0))...)
+	tris = append(tris, mkTris(V(-hw, hh, -hd), V(hw, hh, hd), V(-hw, hh, hd), N(0, 1, 0))...)
+	// -Y
+	tris = append(tris, mkTris(V(-hw, -hh, -hd), V(hw, -hh, hd), V(hw, -hh, -hd), N(0, -1, 0))...)
+	tris = append(tris, mkTris(V(-hw, -hh, -hd), V(-hw, -hh, hd), V(hw, -hh, hd), N(0, -1, 0))...)
+	// +Z
+	tris = append(tris, mkTris(V(-hw, -hh, hd), V(hw, -hh, hd), V(hw, hh, hd), N(0, 0, 1))...)
+	tris = append(tris, mkTris(V(-hw, -hh, hd), V(hw, hh, hd), V(-hw, hh, hd), N(0, 0, 1))...)
+	// -Z
+	tris = append(tris, mkTris(V(-hw, -hh, -hd), V(hw, hh, -hd), V(hw, -hh, -hd), N(0, 0, -1))...)
+	tris = append(tris, mkTris(V(-hw, -hh, -hd), V(-hw, hh, -hd), V(hw, hh, -hd), N(0, 0, -1))...)
+
+	root := buildBVH(tris)
+	return &Model{root: root, radius: math.Sqrt(hw*hw + hh*hh + hd*hd)}
+}
+
 func LoadGLB(path string) (*Model, error) {
 	doc, err := gltf.Open(path)
 	if err != nil {
