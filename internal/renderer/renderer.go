@@ -6,15 +6,9 @@ import (
 	"sync"
 
 	"term-render/internal/geo"
-	mdl "term-render/internal/model"
 
 	"github.com/gdamore/tcell/v2"
 )
-
-type Camera struct {
-	Pos        geo.Vec3
-	Yaw, Pitch float64
-}
 
 type Renderer struct {
 	buf          [][]float64
@@ -25,7 +19,7 @@ func New() *Renderer {
 	return &Renderer{}
 }
 
-func (r *Renderer) Render(s tcell.Screen, camera Camera, model *mdl.Model) {
+func (r *Renderer) Render(s tcell.Screen, camera Camera, scene Scene) {
 	w, h := s.Size()
 	bw, bh := w*2, h*4
 
@@ -37,7 +31,7 @@ func (r *Renderer) Render(s tcell.Screen, camera Camera, model *mdl.Model) {
 		r.prevW, r.prevH = w, h
 	}
 
-	renderToBuffer(r.buf, bw, bh, camera, model)
+	renderToBuffer(r.buf, bw, bh, camera, scene)
 	floydSteinberg(r.buf, bw, bh)
 
 	for y := 0; y < h; y++ {
@@ -47,10 +41,10 @@ func (r *Renderer) Render(s tcell.Screen, camera Camera, model *mdl.Model) {
 	}
 }
 
-func renderToBuffer(buf [][]float64, bw, bh int, camera Camera, model *mdl.Model) {
+func renderToBuffer(buf [][]float64, bw, bh int, camera Camera, scene Scene) {
 	numCPU := runtime.GOMAXPROCS(0)
 	if bh < numCPU*2 {
-		renderRowRange(buf, bw, bh, camera, model, 0, bh)
+		renderRowRange(buf, bw, bh, camera, scene, 0, bh)
 		return
 	}
 
@@ -69,38 +63,38 @@ func renderToBuffer(buf [][]float64, bw, bh int, camera Camera, model *mdl.Model
 		wg.Add(1)
 		go func(y0, y1 int) {
 			defer wg.Done()
-			renderRowRange(buf, bw, bh, camera, model, y0, y1)
+			renderRowRange(buf, bw, bh, camera, scene, y0, y1)
 		}(y0, y1)
 	}
 	wg.Wait()
 }
 
-func renderRowRange(buf [][]float64, bw, bh int, camera Camera, model *mdl.Model, y0, y1 int) {
+func renderRowRange(buf [][]float64, bw, bh int, camera Camera, scene Scene, y0, y1 int) {
 	for y := y0; y < y1; y++ {
 		for x := 0; x < bw; x++ {
-			buf[y][x] = brightness(x, y, bw, bh, camera, model)
+			buf[y][x] = brightness(x, y, bw, bh, camera, scene)
 		}
 	}
 }
 
-func brightness(bx, by, bw, bh int, camera Camera, model *mdl.Model) float64 {
+func brightness(bx, by, bw, bh int, camera Camera, scene Scene) float64 {
 	aspect := float64(bw) / float64(bh)
 	px := (float64(bx)/float64(bw) - 0.5) * 2 * aspect
 	py := (float64(by)/float64(bh) - 0.5) * -2
 
-	n, hp, vp, ok := raycast(camera, px, py, model)
+	n, hp, vp, ok := raycast(camera, px, py, scene)
 	if !ok {
 		return 0
 	}
 	return shading(n, hp, vp)
 }
 
-func raycast(camera Camera, px, py float64, model *mdl.Model) (n, hp, vp geo.Vec3, ok bool) {
+func raycast(camera Camera, px, py float64, scene Scene) (n, hp, vp geo.Vec3, ok bool) {
 	ro := camera.Pos
 	rd := geo.NewVec3(px, py, 1).Norm()
 	rd = rd.RotY(-camera.Yaw).RotX(-camera.Pitch)
 
-	hit, ok := model.Intersect(ro, rd)
+	hit, ok := scene.Intersect(ro, rd)
 	if !ok {
 		return geo.Vec3{}, geo.Vec3{}, geo.Vec3{}, false
 	}

@@ -13,6 +13,18 @@ import (
 	"github.com/gdamore/tcell/v2"
 )
 
+type ViewScene struct {
+	*mdl.Model
+}
+
+func (v *ViewScene) Intersect(ro, rd geo.Vec3) (renderer.Hit, bool) {
+	hit, ok := v.Model.Intersect(ro, rd)
+	if !ok {
+		return renderer.Hit{}, false
+	}
+	return renderer.Hit{Point: hit.Point, Normal: hit.Normal}, true
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintf(os.Stderr, "usage: %s <model.glb>\n", os.Args[0])
@@ -22,6 +34,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	scene := &ViewScene{Model: model}
 	s, err := tcell.NewScreen()
 	if err != nil {
 		panic(err)
@@ -52,7 +65,7 @@ func main() {
 			camPos := geo.NewVec3(0, 0, -7.0).RotY(-yaw).RotX(-pitch)
 			camera := renderer.Camera{Pos: camPos, Yaw: yaw, Pitch: pitch}
 			s.Clear()
-			r.Render(s, camera, model)
+			r.Render(s, camera, scene)
 			s.Show()
 
 		case ev := <-eventCh:
