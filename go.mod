@@ -1,4 +1,4 @@
-module test-term
+module term-render
 
 go 1.26.4
 

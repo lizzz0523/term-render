@@ -5,8 +5,8 @@ import (
 	"runtime"
 	"sync"
 
-	"test-term/internal/geo"
-	mdl "test-term/internal/model"
+	"term-render/internal/geo"
+	mdl "term-render/internal/model"
 
 	"github.com/gdamore/tcell/v2"
 )

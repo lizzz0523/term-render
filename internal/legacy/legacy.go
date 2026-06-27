@@ -3,7 +3,7 @@ package legacy
 import (
 	"math"
 
-	"test-term/internal/geo"
+	"term-render/internal/geo"
 )
 
 const (

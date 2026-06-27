@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
-	mdl "test-term/internal/model"
-	"test-term/internal/renderer"
+	mdl "term-render/internal/model"
+	"term-render/internal/renderer"
 
 	"github.com/gdamore/tcell/v2"
 )

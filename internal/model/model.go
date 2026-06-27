@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math"
 
-	"test-term/internal/geo"
+	"term-render/internal/geo"
 
 	"github.com/qmuntal/gltf"
 )

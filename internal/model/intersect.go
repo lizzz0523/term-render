@@ -3,7 +3,7 @@ package model
 import (
 	"math"
 
-	"test-term/internal/geo"
+	"term-render/internal/geo"
 )
 
 type Hit struct {
