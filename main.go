@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"time"
 
@@ -45,7 +44,7 @@ func main() {
 	defer s.Fini()
 
 	r := renderer.New()
-	start := time.Now()
+	prev := time.Now()
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 
@@ -56,14 +55,16 @@ func main() {
 		}
 	}()
 
+	camera := renderer.Camera{Pos: geo.NewVec3(0, 0, -7.0), Yaw: 0, Pitch: 0}
+
 	for {
 		select {
 		case <-ticker.C:
-			t := time.Since(start).Seconds()
-			yaw := t * 0.7
-			pitch := 0.5 + 0.3*math.Sin(t*0.6)
-			camPos := geo.NewVec3(0, 0, -7.0).RotY(-yaw).RotX(-pitch)
-			camera := renderer.Camera{Pos: camPos, Yaw: yaw, Pitch: pitch}
+			now := time.Now()
+			dt := now.Sub(prev).Seconds()
+			prev = now
+
+			model.RotateY(0.7 * dt)
 			s.Clear()
 			r.Render(s, camera, scene)
 			s.Show()

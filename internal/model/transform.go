@@ -1,5 +1,7 @@
 package model
 
+import "term-render/internal/geo"
+
 func (m *Model) Scale(s float64) {
 	m.root.scale(s)
 	m.radius *= s
@@ -32,13 +34,25 @@ func (n *bvhNode) rotateY(angle float64) {
 	if n == nil {
 		return
 	}
-	n.min = n.min.RotY(angle)
-	n.max = n.max.RotY(angle)
 	for i := range n.triangles {
 		n.triangles[i].rotateY(angle)
 	}
 	n.left.rotateY(angle)
 	n.right.rotateY(angle)
+
+	if len(n.triangles) > 0 {
+		n.min = n.triangles[0].v0
+		n.max = n.triangles[0].v0
+		for _, t := range n.triangles {
+			for _, v := range []geo.Vec3{t.v0, t.v1, t.v2} {
+				n.min = geo.MinVec(n.min, v)
+				n.max = geo.MaxVec(n.max, v)
+			}
+		}
+	} else {
+		n.min = geo.MinVec(n.left.min, n.right.min)
+		n.max = geo.MaxVec(n.left.max, n.right.max)
+	}
 }
 
 func (t *triangle) rotateY(angle float64) {
