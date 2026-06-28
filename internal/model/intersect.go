@@ -3,6 +3,7 @@ package model
 import (
 	"math"
 
+	"term-render/internal/color"
 	"term-render/internal/geo"
 )
 
@@ -10,13 +11,14 @@ type Hit struct {
 	t      float64
 	Point  geo.Vec3
 	Normal geo.Vec3
+	Color  color.Color
 }
 
 func (m *Model) Intersect(ro, rd geo.Vec3) (Hit, bool) {
-	return m.root.intersect(ro, rd)
+	return m.root.intersect(ro, rd, m.textures)
 }
 
-func (n *bvhNode) intersect(ro, rd geo.Vec3) (Hit, bool) {
+func (n *bvhNode) intersect(ro, rd geo.Vec3, textures []texture) (Hit, bool) {
 	tMin, tMax := aabbHit(ro, rd, n.min, n.max)
 	if tMax < tMin || tMax < 0 {
 		return Hit{}, false
@@ -26,8 +28,8 @@ func (n *bvhNode) intersect(ro, rd geo.Vec3) (Hit, bool) {
 	hit := false
 
 	if n.left == nil && n.right == nil {
-		for _, triangle := range n.triangles {
-			if h, ok := triangle.intersect(ro, rd); ok && h.t < best.t {
+		for _, tri := range n.triangles {
+			if h, ok := tri.intersect(ro, rd, textures); ok && h.t < best.t {
 				best = h
 				hit = true
 			}
@@ -37,7 +39,7 @@ func (n *bvhNode) intersect(ro, rd geo.Vec3) (Hit, bool) {
 			if child == nil {
 				continue
 			}
-			if h, ok := child.intersect(ro, rd); ok && h.t < best.t {
+			if h, ok := child.intersect(ro, rd, textures); ok && h.t < best.t {
 				best = h
 				hit = true
 			}
@@ -66,7 +68,7 @@ func aabbHit(ro, rd, min, max geo.Vec3) (tMin, tMax float64) {
 	return tMin, tMax
 }
 
-func (t *triangle) intersect(ro, rd geo.Vec3) (Hit, bool) {
+func (t *triangle) intersect(ro, rd geo.Vec3, textures []texture) (Hit, bool) {
 	e1 := t.v1.Sub(t.v0)
 	e2 := t.v2.Sub(t.v0)
 	p := rd.Cross(e2)
@@ -98,5 +100,38 @@ func (t *triangle) intersect(ro, rd geo.Vec3) (Hit, bool) {
 	w := 1 - u - v
 	normal := t.n0.Mul(w).Add(t.n1.Mul(u)).Add(t.n2.Mul(v)).Norm()
 
-	return Hit{t: dist, Point: point, Normal: normal}, true
+	colorR := t.c0.R*w + t.c1.R*u + t.c2.R*v
+	colorG := t.c0.G*w + t.c1.G*u + t.c2.G*v
+	colorB := t.c0.B*w + t.c1.B*u + t.c2.B*v
+	c := color.New(colorR, colorG, colorB)
+
+	if t.texIdx >= 0 && t.texIdx < len(textures) {
+		uvU := t.t0.U*w + t.t1.U*u + t.t2.U*v
+		uvV := t.t0.V*w + t.t1.V*u + t.t2.V*v
+		tc := sampleTexture(textures[t.texIdx], uvU, uvV)
+		c = tc.Mul(c)
+	}
+
+	return Hit{t: dist, Point: point, Normal: normal, Color: c}, true
+}
+
+func sampleTexture(tex texture, u, v float64) color.Color {
+	u = math.Mod(u, 1.0)
+	if u < 0 {
+		u += 1.0
+	}
+	v = math.Mod(v, 1.0)
+	if v < 0 {
+		v += 1.0
+	}
+
+	px := int(u*float64(tex.Width)) % tex.Width
+	py := int(v*float64(tex.Height)) % tex.Height
+	offset := (py*tex.Width + px) * 4
+
+	return color.New(
+		float64(tex.Image.Pix[offset])/255.0,
+		float64(tex.Image.Pix[offset+1])/255.0,
+		float64(tex.Image.Pix[offset+2])/255.0,
+	)
 }

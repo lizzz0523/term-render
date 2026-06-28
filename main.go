@@ -21,7 +21,7 @@ func (v *ViewScene) Intersect(ro, rd geo.Vec3) (renderer.Hit, bool) {
 	if !ok {
 		return renderer.Hit{}, false
 	}
-	return renderer.Hit{Point: hit.Point, Normal: hit.Normal}, true
+	return renderer.Hit{Point: hit.Point, Normal: hit.Normal, Color: hit.Color}, true
 }
 
 func main() {
@@ -33,7 +33,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	model.TranslateY(-1.0)
 
 	scene := &ViewScene{Model: model}
 	s, err := tcell.NewScreen()

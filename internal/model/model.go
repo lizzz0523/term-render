@@ -1,18 +1,24 @@
 package model
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
 	"math"
 
+	"term-render/internal/color"
 	"term-render/internal/geo"
 
 	"github.com/qmuntal/gltf"
 )
 
 type Model struct {
-	root   *bvhNode
-	radius float64
+	root     *bvhNode
+	radius   float64
+	textures []texture
 }
 
 type bvhNode struct {
@@ -25,6 +31,15 @@ type bvhNode struct {
 type triangle struct {
 	v0, v1, v2 geo.Vec3
 	n0, n1, n2 geo.Vec3
+	c0, c1, c2 color.Color
+	t0, t1, t2 geo.Vec2
+	texIdx     int
+}
+
+type texture struct {
+	Image  *image.RGBA
+	Width  int
+	Height int
 }
 
 func NewCube(w, h, d float64) *Model {
@@ -33,31 +48,34 @@ func NewCube(w, h, d float64) *Model {
 	V := func(x, y, z float64) geo.Vec3 { return geo.NewVec3(x, y, z) }
 	N := func(x, y, z float64) geo.Vec3 { return geo.NewVec3(x, y, z) }
 
-	mkTris := func(v0, v1, v2 geo.Vec3, n geo.Vec3) []triangle {
+	mkTris := func(v0, v1, v2 geo.Vec3, n geo.Vec3, c color.Color, t0, t1, t2 geo.Vec2, texIdx int) []triangle {
 		return []triangle{
-			{v0: v0, v1: v1, v2: v2, n0: n, n1: n, n2: n},
+			{v0: v0, v1: v1, v2: v2, n0: n, n1: n, n2: n, c0: c, c1: c, c2: c, t0: t0, t1: t1, t2: t2, texIdx: texIdx},
 		}
 	}
 
+	white := color.New(1, 1, 1)
+	uvZero := geo.NewVec2(0, 0)
+
 	tris := make([]triangle, 0, 12)
 	// +X
-	tris = append(tris, mkTris(V(hw, -hh, -hd), V(hw, -hh, hd), V(hw, hh, hd), N(1, 0, 0))...)
-	tris = append(tris, mkTris(V(hw, -hh, -hd), V(hw, hh, hd), V(hw, hh, -hd), N(1, 0, 0))...)
+	tris = append(tris, mkTris(V(hw, -hh, -hd), V(hw, -hh, hd), V(hw, hh, hd), N(1, 0, 0), white, uvZero, uvZero, uvZero, -1)...)
+	tris = append(tris, mkTris(V(hw, -hh, -hd), V(hw, hh, hd), V(hw, hh, -hd), N(1, 0, 0), white, uvZero, uvZero, uvZero, -1)...)
 	// -X
-	tris = append(tris, mkTris(V(-hw, -hh, -hd), V(-hw, hh, hd), V(-hw, -hh, hd), N(-1, 0, 0))...)
-	tris = append(tris, mkTris(V(-hw, -hh, -hd), V(-hw, hh, -hd), V(-hw, hh, hd), N(-1, 0, 0))...)
+	tris = append(tris, mkTris(V(-hw, -hh, -hd), V(-hw, hh, hd), V(-hw, -hh, hd), N(-1, 0, 0), white, uvZero, uvZero, uvZero, -1)...)
+	tris = append(tris, mkTris(V(-hw, -hh, -hd), V(-hw, hh, -hd), V(-hw, hh, hd), N(-1, 0, 0), white, uvZero, uvZero, uvZero, -1)...)
 	// +Y
-	tris = append(tris, mkTris(V(-hw, hh, -hd), V(hw, hh, -hd), V(hw, hh, hd), N(0, 1, 0))...)
-	tris = append(tris, mkTris(V(-hw, hh, -hd), V(hw, hh, hd), V(-hw, hh, hd), N(0, 1, 0))...)
+	tris = append(tris, mkTris(V(-hw, hh, -hd), V(hw, hh, -hd), V(hw, hh, hd), N(0, 1, 0), white, uvZero, uvZero, uvZero, -1)...)
+	tris = append(tris, mkTris(V(-hw, hh, -hd), V(hw, hh, hd), V(-hw, hh, hd), N(0, 1, 0), white, uvZero, uvZero, uvZero, -1)...)
 	// -Y
-	tris = append(tris, mkTris(V(-hw, -hh, -hd), V(hw, -hh, hd), V(hw, -hh, -hd), N(0, -1, 0))...)
-	tris = append(tris, mkTris(V(-hw, -hh, -hd), V(-hw, -hh, hd), V(hw, -hh, hd), N(0, -1, 0))...)
+	tris = append(tris, mkTris(V(-hw, -hh, -hd), V(hw, -hh, hd), V(hw, -hh, -hd), N(0, -1, 0), white, uvZero, uvZero, uvZero, -1)...)
+	tris = append(tris, mkTris(V(-hw, -hh, -hd), V(-hw, -hh, hd), V(hw, -hh, hd), N(0, -1, 0), white, uvZero, uvZero, uvZero, -1)...)
 	// +Z
-	tris = append(tris, mkTris(V(-hw, -hh, hd), V(hw, -hh, hd), V(hw, hh, hd), N(0, 0, 1))...)
-	tris = append(tris, mkTris(V(-hw, -hh, hd), V(hw, hh, hd), V(-hw, hh, hd), N(0, 0, 1))...)
+	tris = append(tris, mkTris(V(-hw, -hh, hd), V(hw, -hh, hd), V(hw, hh, hd), N(0, 0, 1), white, uvZero, uvZero, uvZero, -1)...)
+	tris = append(tris, mkTris(V(-hw, -hh, hd), V(hw, hh, hd), V(-hw, hh, hd), N(0, 0, 1), white, uvZero, uvZero, uvZero, -1)...)
 	// -Z
-	tris = append(tris, mkTris(V(-hw, -hh, -hd), V(hw, hh, -hd), V(hw, -hh, -hd), N(0, 0, -1))...)
-	tris = append(tris, mkTris(V(-hw, -hh, -hd), V(-hw, hh, -hd), V(hw, hh, -hd), N(0, 0, -1))...)
+	tris = append(tris, mkTris(V(-hw, -hh, -hd), V(hw, hh, -hd), V(hw, -hh, -hd), N(0, 0, -1), white, uvZero, uvZero, uvZero, -1)...)
+	tris = append(tris, mkTris(V(-hw, -hh, -hd), V(-hw, hh, -hd), V(hw, hh, -hd), N(0, 0, -1), white, uvZero, uvZero, uvZero, -1)...)
 
 	root := buildBVH(tris)
 	return &Model{root: root, radius: math.Sqrt(hw*hw + hh*hh + hd*hd)}
@@ -71,6 +89,11 @@ func LoadGLB(path string, targetRadius float64) (*Model, error) {
 
 	if len(doc.Meshes) == 0 {
 		return nil, fmt.Errorf("no meshes found in GLB")
+	}
+
+	textures, err := loadTextures(doc)
+	if err != nil {
+		return nil, err
 	}
 
 	parent := buildParentMap(doc)
@@ -95,9 +118,49 @@ func LoadGLB(path string, targetRadius float64) (*Model, error) {
 				normals = readFloats(doc, nrmAcc)
 			}
 
+			var colors []float64
+			if idx, ok := prim.Attributes["COLOR_0"]; ok {
+				colAcc := doc.Accessors[idx]
+				colors = readColors(doc, colAcc)
+			}
+
+			var uvs []float64
+			if idx, ok := prim.Attributes["TEXCOORD_0"]; ok {
+				uvAcc := doc.Accessors[idx]
+				uvs = readVec2s(doc, uvAcc)
+			}
+
+			materialColor := color.New(1, 1, 1)
+			if prim.Material != nil {
+				mat := doc.Materials[*prim.Material]
+				if mat.PBRMetallicRoughness != nil {
+					bcf := mat.PBRMetallicRoughness.BaseColorFactorOrDefault()
+					materialColor = color.New(bcf[0], bcf[1], bcf[2])
+				}
+			}
+
+			texIdx := -1
+			if prim.Material != nil {
+				mat := doc.Materials[*prim.Material]
+				if mat.PBRMetallicRoughness != nil && mat.PBRMetallicRoughness.BaseColorTexture != nil {
+					texInfo := mat.PBRMetallicRoughness.BaseColorTexture
+					if texInfo.Index < len(doc.Textures) {
+						tex := doc.Textures[texInfo.Index]
+						if tex.Source != nil && *tex.Source < len(textures) {
+							texIdx = *tex.Source
+						}
+					}
+				}
+			}
+			// Fallback: if the primitive has UV coordinates and textures exist
+			// but no BaseColorTexture, assume the first texture should be used.
+			if texIdx < 0 && len(uvs) > 0 && len(textures) > 0 {
+				texIdx = 0
+			}
+
 			indices := readIndices(doc, doc.Accessors[*prim.Indices])
 
-			tris := buildTriangles(positions, normals, indices, worldMat)
+			tris := buildTriangles(positions, normals, colors, uvs, materialColor, texIdx, indices, worldMat)
 			allTris = append(allTris, tris...)
 		}
 	}
@@ -115,10 +178,9 @@ func LoadGLB(path string, targetRadius float64) (*Model, error) {
 
 	root := buildBVH(allTris)
 
-	return &Model{root: root, radius: targetRadius}, nil
+	return &Model{root: root, radius: targetRadius, textures: textures}, nil
 }
 
-// buildParentMap maps each child node index to its parent node index.
 func buildParentMap(doc *gltf.Document) map[int]int {
 	parent := make(map[int]int)
 	for i, n := range doc.Nodes {
@@ -129,7 +191,6 @@ func buildParentMap(doc *gltf.Document) map[int]int {
 	return parent
 }
 
-// buildMeshMap returns a map from mesh index to the node index that references it.
 func buildMeshMap(doc *gltf.Document) map[int]int {
 	result := make(map[int]int)
 	for i, n := range doc.Nodes {
@@ -140,8 +201,6 @@ func buildMeshMap(doc *gltf.Document) map[int]int {
 	return result
 }
 
-// computeWorldMatrices computes the world-space transform for every node
-// by traversing the scene graph from root nodes.
 func computeWorldMatrices(doc *gltf.Document, parent map[int]int) []geo.Mat4 {
 	result := make([]geo.Mat4, len(doc.Nodes))
 	for i := range result {
@@ -177,9 +236,8 @@ func computeWorldMatrices(doc *gltf.Document, parent map[int]int) []geo.Mat4 {
 	return result
 }
 
-// nodeLocalMatrix returns the local TRS matrix.
-// Uses the explicit Matrix field if set, otherwise decomposes from T*R*S.
 func nodeLocalMatrix(n *gltf.Node) geo.Mat4 {
+	// Decompose from T * R * S when no explicit matrix is provided.
 	m := n.MatrixOrDefault()
 	if m != gltf.DefaultMatrix {
 		return geo.Mat4From64(m)
@@ -216,6 +274,122 @@ func readFloats(doc *gltf.Document, acc *gltf.Accessor) []float64 {
 	return result
 }
 
+func readColors(doc *gltf.Document, acc *gltf.Accessor) []float64 {
+	bufView := doc.BufferViews[*acc.BufferView]
+	bufData := doc.Buffers[bufView.Buffer].Data
+	start := bufView.ByteOffset + acc.ByteOffset
+	count := acc.Count
+	totalComps := acc.Type.Components()
+	rgbComps := 3
+
+	result := make([]float64, count*rgbComps)
+
+	switch acc.ComponentType {
+	case gltf.ComponentFloat:
+		for i := 0; i < count; i++ {
+			src := start + i*totalComps*4
+			dst := i * rgbComps
+			for j := 0; j < rgbComps; j++ {
+				result[dst+j] = float64(math.Float32frombits(
+					binary.LittleEndian.Uint32(bufData[src+j*4:])))
+			}
+		}
+	case gltf.ComponentByte:
+		for i := 0; i < count; i++ {
+			src := start + i*totalComps
+			dst := i * rgbComps
+			for j := 0; j < rgbComps; j++ {
+				v := float64(int8(bufData[src+j]))
+				if v < 0 {
+					v = 0
+				}
+				result[dst+j] = v / 127.0
+			}
+		}
+	case gltf.ComponentUbyte:
+		for i := 0; i < count; i++ {
+			src := start + i*totalComps
+			dst := i * rgbComps
+			for j := 0; j < rgbComps; j++ {
+				result[dst+j] = float64(bufData[src+j]) / 255.0
+			}
+		}
+	case gltf.ComponentShort:
+		for i := 0; i < count; i++ {
+			src := start + i*totalComps*2
+			dst := i * rgbComps
+			for j := 0; j < rgbComps; j++ {
+				v := float64(int16(binary.LittleEndian.Uint16(bufData[src+j*2:])))
+				if v < 0 {
+					v = 0
+				}
+				result[dst+j] = v / 32767.0
+			}
+		}
+	case gltf.ComponentUshort:
+		for i := 0; i < count; i++ {
+			src := start + i*totalComps*2
+			dst := i * rgbComps
+			for j := 0; j < rgbComps; j++ {
+				result[dst+j] = float64(binary.LittleEndian.Uint16(
+					bufData[src+j*2:])) / 65535.0
+			}
+		}
+	}
+	return result
+}
+
+func readVec2s(doc *gltf.Document, acc *gltf.Accessor) []float64 {
+	bufView := doc.BufferViews[*acc.BufferView]
+	bufData := doc.Buffers[bufView.Buffer].Data
+	start := bufView.ByteOffset + acc.ByteOffset
+	count := acc.Count
+	byteSize := acc.ComponentType.ByteSize()
+
+	result := make([]float64, count*2)
+	for i := 0; i < count*2; i++ {
+		offset := start + i*byteSize
+		result[i] = float64(math.Float32frombits(binary.LittleEndian.Uint32(bufData[offset:])))
+	}
+	return result
+}
+
+func loadTextures(doc *gltf.Document) ([]texture, error) {
+	var textures []texture
+	for _, img := range doc.Images {
+		var raw []byte
+		if img.BufferView != nil {
+			bv := doc.BufferViews[*img.BufferView]
+			buf := doc.Buffers[bv.Buffer].Data
+			raw = buf[bv.ByteOffset : bv.ByteOffset+bv.ByteLength]
+		} else if img.URI != "" {
+			return nil, fmt.Errorf("external texture references not supported: %s", img.URI)
+		}
+		if len(raw) == 0 {
+			continue
+		}
+
+		decoded, _, err := image.Decode(bytes.NewReader(raw))
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode texture: %w", err)
+		}
+
+		bounds := decoded.Bounds()
+		rgba := image.NewRGBA(bounds)
+		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+			for x := bounds.Min.X; x < bounds.Max.X; x++ {
+				rgba.Set(x, y, decoded.At(x, y))
+			}
+		}
+		textures = append(textures, texture{
+			Image:  rgba,
+			Width:  bounds.Dx(),
+			Height: bounds.Dy(),
+		})
+	}
+	return textures, nil
+}
+
 func readIndices(doc *gltf.Document, acc *gltf.Accessor) []uint32 {
 	bufView := doc.BufferViews[*acc.BufferView]
 	bufData := doc.Buffers[bufView.Buffer].Data
@@ -237,9 +411,11 @@ func readIndices(doc *gltf.Document, acc *gltf.Accessor) []uint32 {
 	return result
 }
 
-func buildTriangles(positions, normals []float64, indices []uint32, mat geo.Mat4) []triangle {
+func buildTriangles(positions, normals, colors, uvs []float64, materialColor color.Color, texIdx int, indices []uint32, mat geo.Mat4) []triangle {
 	tris := make([]triangle, 0, len(indices)/3)
 	hasNormals := len(normals) == len(positions)
+	hasColors := len(colors) > 0
+	hasUVs := len(uvs) > 0
 
 	for i := 0; i < len(indices); i += 3 {
 		i0, i1, i2 := indices[i], indices[i+1], indices[i+2]
@@ -267,7 +443,31 @@ func buildTriangles(positions, normals []float64, indices []uint32, mat geo.Mat4
 			n0, n1, n2 = fn, fn, fn
 		}
 
-		tris = append(tris, triangle{v0, v1, v2, n0, n1, n2})
+		var c0, c1, c2 color.Color
+		white := color.New(1, 1, 1)
+		if hasColors {
+			c0 = color.New(colors[i0*3], colors[i0*3+1], colors[i0*3+2])
+			c1 = color.New(colors[i1*3], colors[i1*3+1], colors[i1*3+2])
+			c2 = color.New(colors[i2*3], colors[i2*3+1], colors[i2*3+2])
+		} else {
+			c0, c1, c2 = white, white, white
+		}
+		// Only multiply materialColor when there is no texture (texIdx < 0).
+		// When a texture is present, color is sampled from it in intersect.
+		if texIdx < 0 {
+			c0 = c0.Mul(materialColor)
+			c1 = c1.Mul(materialColor)
+			c2 = c2.Mul(materialColor)
+		}
+
+		var t0, t1, t2 geo.Vec2
+		if hasUVs {
+			t0 = geo.NewVec2(uvs[i0*2], uvs[i0*2+1])
+			t1 = geo.NewVec2(uvs[i1*2], uvs[i1*2+1])
+			t2 = geo.NewVec2(uvs[i2*2], uvs[i2*2+1])
+		}
+
+		tris = append(tris, triangle{v0, v1, v2, n0, n1, n2, c0, c1, c2, t0, t1, t2, texIdx})
 	}
 	return tris
 }
