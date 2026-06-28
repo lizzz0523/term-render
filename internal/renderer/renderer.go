@@ -195,7 +195,7 @@ func brailleChar(buf [][]Cell, sx, sy int) (rune, tcell.Style) {
 	r := int32(sumR / 8 * 255)
 	g := int32(sumG / 8 * 255)
 	b := int32(sumB / 8 * 255)
-	style := tcell.StyleDefault.Foreground(tcell.NewRGBColor(r, g, b))
+	style := tcell.StyleDefault.Foreground(tcell.NewRGBColor(r, g, b)).Background(tcell.ColorBlack)
 
 	return rune(0x2800 + code), style
 }
