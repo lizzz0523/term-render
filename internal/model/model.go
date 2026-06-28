@@ -96,15 +96,15 @@ func LoadGLB(path string, targetRadius float64) (*Model, error) {
 		return nil, err
 	}
 
-	parent := buildParentMap(doc)
-	meshNode := buildMeshMap(doc)
-	worldMatrices := computeWorldMatrices(doc, parent)
+	meshMap := buildMeshMap(doc)
+	parentMap := buildParentMap(doc)
+	worldMatrices := computeWorldMatrices(doc, parentMap)
 
 	var allTris []triangle
 
 	for meshIdx, mesh := range doc.Meshes {
 		worldMat := geo.Mat4Identity()
-		if nodeIdx, ok := meshNode[meshIdx]; ok {
+		if nodeIdx, ok := meshMap[meshIdx]; ok {
 			worldMat = worldMatrices[nodeIdx]
 		}
 
@@ -181,16 +181,6 @@ func LoadGLB(path string, targetRadius float64) (*Model, error) {
 	return &Model{root: root, radius: targetRadius, textures: textures}, nil
 }
 
-func buildParentMap(doc *gltf.Document) map[int]int {
-	parent := make(map[int]int)
-	for i, n := range doc.Nodes {
-		for _, child := range n.Children {
-			parent[child] = i
-		}
-	}
-	return parent
-}
-
 func buildMeshMap(doc *gltf.Document) map[int]int {
 	result := make(map[int]int)
 	for i, n := range doc.Nodes {
@@ -201,7 +191,17 @@ func buildMeshMap(doc *gltf.Document) map[int]int {
 	return result
 }
 
-func computeWorldMatrices(doc *gltf.Document, parent map[int]int) []geo.Mat4 {
+func buildParentMap(doc *gltf.Document) map[int]int {
+	result := make(map[int]int)
+	for i, n := range doc.Nodes {
+		for _, child := range n.Children {
+			result[child] = i
+		}
+	}
+	return result
+}
+
+func computeWorldMatrices(doc *gltf.Document, parentMap map[int]int) []geo.Mat4 {
 	result := make([]geo.Mat4, len(doc.Nodes))
 	for i := range result {
 		result[i] = geo.Mat4Identity()
@@ -209,7 +209,7 @@ func computeWorldMatrices(doc *gltf.Document, parent map[int]int) []geo.Mat4 {
 
 	var roots []int
 	for i := range doc.Nodes {
-		if _, hasParent := parent[i]; !hasParent {
+		if _, hasParent := parentMap[i]; !hasParent {
 			roots = append(roots, i)
 		}
 	}
@@ -336,6 +336,7 @@ func readColors(doc *gltf.Document, acc *gltf.Accessor) []float64 {
 			}
 		}
 	}
+
 	return result
 }
 
@@ -359,9 +360,9 @@ func loadTextures(doc *gltf.Document) ([]texture, error) {
 	for _, img := range doc.Images {
 		var raw []byte
 		if img.BufferView != nil {
-			bv := doc.BufferViews[*img.BufferView]
-			buf := doc.Buffers[bv.Buffer].Data
-			raw = buf[bv.ByteOffset : bv.ByteOffset+bv.ByteLength]
+			bufView := doc.BufferViews[*img.BufferView]
+			bufData := doc.Buffers[bufView.Buffer].Data
+			raw = bufData[bufView.ByteOffset : bufView.ByteOffset+bufView.ByteLength]
 		} else if img.URI != "" {
 			return nil, fmt.Errorf("external texture references not supported: %s", img.URI)
 		}
